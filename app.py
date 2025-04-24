@@ -2,7 +2,7 @@
 import flet as ft
 import os
 import logging
-from genie_agent import askFounfryAiAgent
+from genie_agent import askFoundryAiAgent
 
 
 def initialize_loggin():
@@ -16,7 +16,7 @@ def initialize_loggin():
 
 
 def agent_executor(input_data, chain, logger):
-   agentREsponse=askFounfryAiAgent(input_data["question"])    
+   agentREsponse=askFoundryAiAgent(input_data["question"])    
    return agentREsponse
 
 

@@ -229,7 +229,7 @@ except Exception as e:
 thread = project_client.agents.create_thread()
 print(f"Created thread, thread ID: {thread.id}")
 
-def askFounfryAiAgent(string: str) -> str:
+def askFoundryAiAgent(string: str) -> str:
     """
     Sends a user query to the Foundry AI Agent and retrieves the response.
 
