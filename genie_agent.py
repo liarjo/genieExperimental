@@ -180,54 +180,63 @@ def askDatabaseQuestions(prompt: str) -> str:
     answer, new_conversation_id =  asyncio.run(askADBGenieAsync(prompt))
     return answer
 
-# Statically defined user functions for fast reference
-user_functions: Set[Callable[..., Any]] = {
-    askDatabaseQuestions,
 
-}
 
-# Initialize agent toolset with user functions
-functions = FunctionTool(user_functions)
-myToolSet = ToolSet()
-myToolSet.add(functions)
 
-agentInsructions = """
-you are an agent that response user questions.
-for question related to date topics listes below you must  use the function askDatabaseQuestions.
-when you call the function askDatabaseQuestions, you must use the same prompt as the user question. you don't change the prompt.
-When you get the response from the function askDatabaseQuestions, you must return the response to the user as is.
-you must not change the response from the function askDatabaseQuestions.
-the topics are:
-- database schema questions
-- Driver questions
-"""
-project_client = AIProjectClient.from_connection_string(
-    credential=DefaultAzureCredential(), conn_str=os.environ["PROJECT_CONNECTION_STRING"]
-)
+def InitAgent()-> tuple[str, str, AIProjectClient, ToolSet]:
+    # Statically defined user functions for fast reference
+    user_functions: Set[Callable[..., Any]] = {
+        askDatabaseQuestions,
 
-#enable_auto_function_calls
-project_client.agents.enable_auto_function_calls(toolset=myToolSet)
+    }
 
-# Create or get an existing agent, use your own agent ID
-agent_ID="asst_tFGbBbXlVYFEGbDR2dhaLuPA"
+    # Initialize agent toolset with user functions
+    functions = FunctionTool(user_functions)
+    theToolSet = ToolSet()
+    theToolSet.add(functions)
 
-try:
-    myAgent = project_client.agents.get_agent(agent_ID)
-    print(f"Existent agent, agent ID: {myAgent.id}")
-except Exception as e:
-    myAgent = project_client.agents.create_agent(
-        model=os.environ["MODEL_DEPLOYMENT_NAME"],
-        name="myADBGenieAgent",
-        instructions=agentInsructions,
-        headers={"x-ms-enable-preview": "true"},
-        toolset=myToolSet
+    agentInsructions = """
+    you are an agent that response user questions.
+    for question related to date topics listes below you must  use the function askDatabaseQuestions.
+    when you call the function askDatabaseQuestions, you must use the same prompt as the user question. you don't change the prompt.
+    When you get the response from the function askDatabaseQuestions, you must return the response to the user as is.
+    you must not change the response from the function askDatabaseQuestions.
+    the topics are:
+    - database schema questions
+    - Driver questions
+    """
+    project_client = AIProjectClient.from_connection_string(
+        credential=DefaultAzureCredential(), conn_str=os.environ["PROJECT_CONNECTION_STRING"]
     )
-    agent_ID = myAgent.id  # Update the agent_ID with the newly created agent's ID
-    print(f"Created agent, agent ID: {myAgent.id}")
 
-# Create a thread
-thread = project_client.agents.create_thread()
-print(f"Created thread, thread ID: {thread.id}")
+    #enable_auto_function_calls
+    project_client.agents.enable_auto_function_calls(toolset=theToolSet)
+
+    # Create or get an existing agent, use your own agent ID
+    agent_ID="asst_tFGbBbXlVYFEGbDR2dhaLuPA"
+
+    try:
+        myAgent = project_client.agents.get_agent(agent_ID)
+        print(f"Existent agent, agent ID: {myAgent.id}")
+    except Exception as e:
+        myAgent = project_client.agents.create_agent(
+            model=os.environ["MODEL_DEPLOYMENT_NAME"],
+            name="myADBGenieAgent",
+            instructions=agentInsructions,
+            headers={"x-ms-enable-preview": "true"},
+            toolset=theToolSet
+        )
+        agent_ID = myAgent.id  # Update the agent_ID with the newly created agent's ID
+        print(f"Created agent, agent ID: {myAgent.id}")
+
+    # Create a thread
+    thread = project_client.agents.create_thread()
+    print(f"Created thread, thread ID: {thread.id}")
+
+    return myAgent.id, thread.id, project_client, theToolSet
+
+myAgentID,mytheadID,myPproject_client, myToolSet = InitAgent()
+
 
 def askFoundryAiAgent(string: str) -> str:
     """
@@ -249,15 +258,15 @@ def askFoundryAiAgent(string: str) -> str:
     """
     try:
         # Create a new agent message
-        message = project_client.agents.create_message(
-            thread_id=thread.id,
+        message = myPproject_client.agents.create_message(
+            thread_id=mytheadID,
             content=string,
             role="user",
         )
         print(f"{Fore.GREEN}Created message, message ID: {message.id}")
 
         # Run the agent
-        run = project_client.agents.create_and_process_run(thread_id=thread.id, agent_id=myAgent.id,toolset=myToolSet)
+        run = myPproject_client.agents.create_and_process_run(thread_id=mytheadID, agent_id=myAgentID,toolset=myToolSet)
         print(f"{Fore.GREEN}Run finished with status: {run.status}")
 
         if run.status == "failed":
@@ -266,7 +275,7 @@ def askFoundryAiAgent(string: str) -> str:
             return f"Error: {run.last_error}"
 
         # Get messages from the thread
-        messages = project_client.agents.list_messages(thread_id=thread.id)
+        messages = myPproject_client.agents.list_messages(thread_id=mytheadID)
        # print(f"Messages: {messages}")
 
         # Get the last message from the sender
