@@ -1,6 +1,6 @@
 # Genie Experimental Project
 
-This project integrates Azure AI and Databricks Genie to create an interactive application for querying and managing data. Below is a description of the key files in this project.
+This project integrates Azure AI and Azure Databricks Genie to create an interactive application for querying and managing data. Below is a description of the key files in this project.
 
 ---
 
@@ -11,13 +11,13 @@ The `app.py` file is the main application that provides a user interface for int
 
 #### Key Features:
 - **Chat Interface**: Users can type questions into a text field and send them to the AI agent.
-- **Agent Integration**: The `askFounfryAiAgent` function from `genie_agent.py` is used to process user queries and fetch responses from the Foundry AI Agent.
+- **Agent Integration**: The `askFoundryAiAgent` function from `genie_agent.py` is used to process user queries and fetch responses from the Foundry AI Agent.
 - **Chat History**: Maintains a history of the last 5 interactions between the user and the agent.
 - **Dynamic UI**: Displays user messages and agent responses in a visually appealing format using avatars and text components.
 
 #### How It Works:
 1. Users type a query into the input field and click the send button.
-2. The query is passed to the `agent_executor` function, which calls the `askFounfryAiAgent` function to get a response.
+2. The query is passed to the `agent_executor` function, which calls the `askFoundryAiAgent` function to get a response.
 3. The response is displayed in the chat interface, and the interaction is stored in the chat history.
 
 ---
@@ -40,7 +40,7 @@ The `testGenieAgent.ipynb` file is a Jupyter Notebook designed for testing and d
 ## Prerequisites
 - Python 3.8 or higher
 - Required Python libraries: `flet`, `azure-ai-projects`, `databricks-sdk`, `colorama`, `pandas`, `nest_asyncio`
-- Properly configured environment variables for Azure and Databricks integration.
+- Properly configured environment variables for Azure and Azure Databricks integration.
 
 ---
 
