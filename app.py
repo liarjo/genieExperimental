@@ -1,6 +1,5 @@
 # Import necessary libraries
 import flet as ft
-import os
 import logging
 from genie_agent import askFoundryAiAgent
 
@@ -12,15 +11,6 @@ def initialize_loggin():
     )
     logger = logging.getLogger(__name__)
    
-
-   
-
-
-def agent_executor(input_data, chain, logger):
-   agentREsponse=askFoundryAiAgent(input_data["question"])    
-   return agentREsponse
-
-
 class Message:
     def __init__(self, user_name: str, text: str, message_type: str):
         self.user_name = user_name
@@ -39,7 +29,7 @@ class ChatMessage(ft.Row):
         # Create the avatar and text components
         avatar = ft.CircleAvatar(
             content=ft.Text(
-                self.get_initials(message.user_name), color=ft.colors.WHITE
+                self.get_initials(message.user_name), color=ft.Colors.WHITE
             ),
             bgcolor=self.get_avatar_color(message.user_name),
         )
@@ -61,19 +51,19 @@ class ChatMessage(ft.Row):
     def get_avatar_color(self, user_name: str):
         # This function assigns a color based on the hash of the user name
         colors_lookup = [
-            ft.colors.AMBER,
-            ft.colors.BLUE,
-            ft.colors.BROWN,
-            ft.colors.CYAN,
-            ft.colors.GREEN,
-            ft.colors.INDIGO,
-            ft.colors.LIME,
-            ft.colors.ORANGE,
-            ft.colors.PINK,
-            ft.colors.PURPLE,
-            ft.colors.RED,
-            ft.colors.TEAL,
-            ft.colors.YELLOW,
+            ft.Colors.AMBER,  # Updated from ft.colors to ft.Colors
+            ft.Colors.BLUE,
+            ft.Colors.BROWN,
+            ft.Colors.CYAN,
+            ft.Colors.GREEN,
+            ft.Colors.INDIGO,
+            ft.Colors.LIME,
+            ft.Colors.ORANGE,
+            ft.Colors.PINK,
+            ft.Colors.PURPLE,
+            ft.Colors.RED,
+            ft.Colors.TEAL,
+            ft.Colors.YELLOW,
         ]
         return colors_lookup[hash(user_name) % len(colors_lookup)]
 
@@ -82,11 +72,9 @@ def main(page: ft.Page):
     # Initialize the Langchain components
     logger = initialize_loggin()
 
-    # Initialize chat history
-    chat_history = []
-
     # Function to handle sending a message
     def send_message_click(e):
+        send_button.disabled = True  # Disable the send button to prevent multiple clicks
         user_input = new_message.value.strip()
         # Clear the input field
         new_message.value = ""
@@ -94,35 +82,36 @@ def main(page: ft.Page):
 
         if user_input:
             # Display user's message in chat interface
-            display_message(user_name, user_input)
+            display_message(user_name, user_input,"")
             page.update()
 
             # Call agent_executor to get the response
-            response = agent_executor(
-                {"question": user_input, "chat_history": chat_history}, "chain", logger
-            )
+            agentREsponse,agentIgmPath=askFoundryAiAgent(user_input) 
 
             # Display agent's response in chat interface
-            display_message("Agent", response)
-
-            # Append to chat history and maintain its size
-            chat_history.append((user_input, response))
-            if len(chat_history) > max_history:
-                chat_history.pop(0)
-
-            # Clear the input field
-            #new_message.value = ""
+            display_message("Agent", agentREsponse,agentIgmPath)
+            
+            # Re-enable the send button
+            send_button.disabled = False  
             page.update()
 
-    def display_message(user_name, text):
+    def display_message(user_name, text, img):
         # Create a message object
-        message = Message(user_name, text, "chat_message")
-        # Create a ChatMessage widget and add it to the chat ListView
-        chat.controls.append(ChatMessage(message))
+        if user_name == "User":
+            message = Message(user_name, text, "chat_message")
+            chat.controls.append(ChatMessage(message))
+        else:
+            #Assitant Message
+            message = Message(user_name, "", "chat_message")
+            chat.controls.append(ChatMessage(message))
+            if img:
+                # Create a message object with image first
+                chat.controls.append(ft.Image(src=img, width=300, height=300))
+            # Text message formated with Markdown
+            chat.controls.append(ft.Markdown(text,extension_set=ft.MarkdownExtensionSet.GITHUB_WEB))  # Separator line
 
     # Flet components setup
     user_name = "User"  # Placeholder for user name
-    max_history = 5  # Maximum size of chat history
 
     # Chat messages ListView
     chat = ft.ListView(expand=True, spacing=10, auto_scroll=True)
@@ -141,15 +130,16 @@ def main(page: ft.Page):
 
     # Send button
     send_button = ft.IconButton(
-        icon=ft.icons.SEND_ROUNDED, tooltip="Send message", on_click=send_message_click
+        icon=ft.Icons.SEND_ROUNDED, tooltip="Send message", on_click=send_message_click
     )
+
     page.title = "Azure AI Agent + Genie Agent"
 
     # Add chat and new message entry to the page
     page.add(
         ft.Container(
             content=chat,
-            border=ft.border.all(1, ft.colors.OUTLINE),
+            border=ft.border.all(1, ft.Colors.OUTLINE),
             border_radius=5,
             padding=10,
             expand=True,
@@ -160,7 +150,6 @@ def main(page: ft.Page):
             alignment="end",
         ),
     )
-
 
 # Run the Flet app
 if __name__ == "__main__":

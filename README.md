@@ -19,17 +19,7 @@ The `app.py` file is the main application that provides a user interface for int
 2. The query is passed to the `agent_executor` function, which calls the `askFoundryAiAgent` function to get a response.
 3. The response is displayed in the chat interface, and the interaction is stored in the chat history.
 
----
 
-### 2. `testGenieAgent.ipynb`
-The `testGenieAgent.ipynb` file is a Jupyter Notebook designed for testing and debugging the functionality implemented.
-
-#### Key Features:
-- **Function Testing**: Allows developers to test the `askFounfryAiAgent` function with various inputs to ensure it works as expected.
-- **Debugging**: Provides a controlled environment to debug issues with the Agent integration.
-- **Interactive Exploration**: Developers can experiment with different prompts and analyze the responses from the agent.
-
----
 
 
 

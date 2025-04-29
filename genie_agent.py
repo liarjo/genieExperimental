@@ -1,21 +1,18 @@
 import os
 import json
 import asyncio
-from typing import Any, Callable, Set, Dict, List, Optional
+from typing import Any, Callable, Set, Dict, Optional
 from pathlib import Path
 from colorama import Fore, Style
 from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import FunctionTool, ToolSet,CodeInterpreterTool,ThreadMessage
 from azure.identity import DefaultAzureCredential
-from azure.ai.projects.models import FunctionTool, ToolSet
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.dashboards import GenieAPI
-import pandas as pd
-import nest_asyncio
 
 
-
-#Print format function to print messages in different colors
 def printFormat(message:str, color: str):
+    #Print format function to print messages in different colors
     print(f"{color}{message}{Style.RESET_ALL}")
 
 async def ask_genie(question: str, space_id: str,workspace_client: WorkspaceClient, conversation_id: Optional[str] = None) -> tuple[str, str]:
@@ -61,7 +58,7 @@ async def ask_genie(question: str, space_id: str,workspace_client: WorkspaceClie
         message_content = await loop.run_in_executor(None, genie_api.get_message,
             space_id, initial_message.conversation_id, initial_message.id)
 
-        
+       
         if query_result and query_result.statement_response:
             results = await loop.run_in_executor(None, workspace_client.statement_execution.get_statement,
                 query_result.statement_response.statement_id)
@@ -92,48 +89,6 @@ async def ask_genie(question: str, space_id: str,workspace_client: WorkspaceClie
     except Exception as e:
         printFormat(f"Error in ask_genie: {str(e)}", Fore.RED)
         return json.dumps({"error": "An error occurred while processing your request."}), conversation_id
-def process_query_results(answer_json: Dict) -> str:
-    """
-    Processes the query results from the Genie API response and formats them into a readable string.
-
-    :param answer_json: The JSON response from the Genie API containing query results or messages.
-    :return: A formatted string containing the query description, results, or message.
-    """
-   
-    response = ""
-    if "query_description" in answer_json and answer_json["query_description"]:
-        response += f"## Query Description\n\n{answer_json['query_description']}\n\n"
-
-    if "columns" in answer_json and "data" in answer_json:
-        response += "## Query Results\n\n"
-        columns = answer_json["columns"]
-        data = answer_json["data"]
-        if isinstance(columns, dict) and "columns" in columns:
-            header = "| " + " | ".join(col["name"] for col in columns["columns"]) + " |"
-            separator = "|" + "|".join(["---" for _ in columns["columns"]]) + "|"
-            response += header + "\n" + separator + "\n"
-            for row in data["data_array"]:
-                formatted_row = []
-                for value, col in zip(row, columns["columns"]):
-                    if value is None:
-                        formatted_value = "NULL"
-                    elif col["type_name"] in ["DECIMAL", "DOUBLE", "FLOAT"]:
-                        formatted_value = f"{float(value):,.2f}"
-                    elif col["type_name"] in ["INT", "BIGINT", "LONG"]:
-                        formatted_value = f"{int(value):,}"
-                    else:
-                        formatted_value = str(value)
-                    formatted_row.append(formatted_value)
-                response += "| " + " | ".join(formatted_row) + " |\n"
-        else:
-            response += f"Unexpected column format: {columns}\n\n"
-    elif "message" in answer_json:
-        response += f"{answer_json['message']}\n\n"
-    else:
-        response += "No data available.\n\n"
-    if "query_query" in answer_json and answer_json["query_query"]:
-        response += f"## Generated Code\n\n```sql\n{answer_json['query_query']}\n```\n\n"
-    return response
 
 async def askADBGenieAsync(prompt: str) -> str:
     """
@@ -156,7 +111,7 @@ async def askADBGenieAsync(prompt: str) -> str:
         )
 
         print(f"")
-        print(f"askDatabaseQuestions Prompt: {prompt}")
+        print(f"askADBGenieAsync Prompt: {prompt}")
         print(f"")
 
         theResponse = await (ask_genie(prompt, DATABRICKS_SPACE_ID, workspace_client))
@@ -168,42 +123,98 @@ async def askADBGenieAsync(prompt: str) -> str:
 
 def askDatabaseQuestions(prompt: str) -> str:
     """
-    Fetches the database information for the specified data.
-    use only for database questions!
+    Fetches the database information for the specified information related to:
+        a. Information about racing circuits.
+        b. Status codes and their descriptions.
+        c. Results of sprint races.
+        d. Information about racing seasons.
+        e. Information about  Details of races.
+        f.  Results of races.
+        g. Qualifying results.
+        h. Details of pit stops.
+        i. Lap times for each driver.
+        j.  Information about drivers.
+        k.  Standings of drivers.
+        L.  Information about constructors (teams).
+        m. Standings of constructors.
+        n.  Results of constructors in races.
+        o. any other data related to formula 1.
+        p.  Information about the database schema.
+        q.  Information about the database tables.
+    
 
-    :param prompt  (str): the question to make to Genie assitante about data.
+    :param prompt  (str): the question to answwer with grounded data 
     :return: text response to the question. 
     :rtype: str
     """
     import nest_asyncio
     nest_asyncio.apply()
-    answer, new_conversation_id =  asyncio.run(askADBGenieAsync(prompt))
+    answer =  asyncio.run(askADBGenieAsync(prompt))
     return answer
-
-
-
 
 def InitAgent()-> tuple[str, str, AIProjectClient, ToolSet]:
     # Statically defined user functions for fast reference
     user_functions: Set[Callable[..., Any]] = {
         askDatabaseQuestions,
-
     }
 
     # Initialize agent toolset with user functions
     functions = FunctionTool(user_functions)
     theToolSet = ToolSet()
     theToolSet.add(functions)
+    #Add codeinterpreter tool to for making graph and charts
+    theToolSet.add(CodeInterpreterTool())
 
     agentInsructions = """
-    you are an agent that response user questions.
-    for question related to date topics listes below you must  use the function askDatabaseQuestions.
-    when you call the function askDatabaseQuestions, you must use the same prompt as the user question. you don't change the prompt.
-    When you get the response from the function askDatabaseQuestions, you must return the response to the user as is.
-    you must not change the response from the function askDatabaseQuestions.
-    the topics are:
-    - database schema questions
-    - Driver questions
+    Advanced asistant Agent Guidelines
+    ========================================
+    - Your role is to assist  users with  data inquiries with a polite, professional, and friendly tone.
+    - Format all text responses in markdown format, always.
+    - Before answering the user question, you must use the tool askDatabaseQuestions to get grounded data first for question realted to:
+        a. Information about racing circuits.
+        b. Status codes and their descriptions.
+        c. Results of sprint races.
+        d. Information about racing seasons.
+        e. Information about  Details of races.
+        f.  Results of races.
+        g. Qualifying results.
+        h. Details of pit stops.
+        i. Lap times for each driver.
+        j.  Information about drivers.
+        k.  Standings of drivers.
+        L.  Information about constructors (teams).
+        m. Standings of constructors.
+        n.  Results of constructors in races.
+        o. any other data related to formula 1.
+        p.  Information about the database schema.
+        q.  Information about the database tables.
+    
+    Tools
+    -----
+    1. instruction to use askDatabaseQuestions
+        - when you call the function askDatabaseQuestions, you must use the same prompt as the user question. you don't change the prompt.
+        - When you get the response from the function askDatabaseQuestions, you must return the response to the user as is.
+        - you must not change the response from the function askDatabaseQuestions.
+        - Present query outputs in markdown tables with colums heads in bold unless the user specifically requests a different visualization.
+
+    2. Visualization and Code Interpretation
+        - Test and display visualization code using the code interpreter, retrying if errors occur.
+        - Always use charts or graphs to illustrate trends when requested.
+        - Always create visualizations as `.png` files.
+        - Adapt visualizations (e.g., labels) to the user's language preferences.
+        - When asked to download data, default to a `.csv` format file and use the most recent data.
+        - Do not include file download links in the response
+
+
+    Conduct Guidelines
+    -------------------
+    - Encourage Clarity: Encourage actionable and relevant questions for better assistance.
+    - Out-of-Scope Queries: For non-formula-1-related or non-city-of-Boston-related quesitons or out-of-scope queries, respond:
+        "I am unable to assist with that. Please contact support for further assistance."
+    - Hostile Users: If users appear upset or hostile, respond:
+        "I am here to help with your  data inquiries. For additional support, contact support team."
+    - Unclear Queries: For unclear or unrelated queries, respond:
+        "I am unable to assist with that. Please ask specific questions about Formual 1  or contact IT for further help."
     """
     project_client = AIProjectClient.from_connection_string(
         credential=DefaultAzureCredential(), conn_str=os.environ["PROJECT_CONNECTION_STRING"]
@@ -213,7 +224,7 @@ def InitAgent()-> tuple[str, str, AIProjectClient, ToolSet]:
     project_client.agents.enable_auto_function_calls(toolset=theToolSet)
 
     # Create or get an existing agent, use your own agent ID
-    agent_ID="asst_tFGbBbXlVYFEGbDR2dhaLuPA"
+    agent_ID=os.environ["Agent_id"]
 
     try:
         myAgent = project_client.agents.get_agent(agent_ID)
@@ -237,8 +248,26 @@ def InitAgent()-> tuple[str, str, AIProjectClient, ToolSet]:
 
 myAgentID,mytheadID,myPproject_client, myToolSet = InitAgent()
 
+def processFoundryAIAgentResponse(assitantResponse: ThreadMessage) -> tuple[str, str]:
+    statement = None
+    imgFullName = None  
+    for myImg in assitantResponse.image_contents:
+        #process image content
+        imgPath=f"{Path.cwd()}\\files"
+        imgNameOnly=f"{myImg.image_file.file_id}_image_file.png"
+        imgFullName = f"{imgPath}\\{imgNameOnly}"
+        #Save IMage content response to local disk
+        myPproject_client.agents.save_file(file_id=myImg.image_file.file_id,file_name=f"{imgFullName}",target_dir=imgPath)
+        #print(f"Saved image file to: {imgFullName}")
+        
+    for myText in assitantResponse.text_messages:
+        #Process text content
+        statement=myText.text.value
+        #print(f"Last Message: {statement}")
 
-def askFoundryAiAgent(string: str) -> str:
+    return statement, imgFullName 
+
+def askFoundryAiAgent(string: str) -> tuple[str,str]:
     """
     Sends a user query to the Foundry AI Agent and retrieves the response.
 
@@ -263,29 +292,33 @@ def askFoundryAiAgent(string: str) -> str:
             content=string,
             role="user",
         )
-        print(f"{Fore.GREEN}Created message, message ID: {message.id}")
+        printFormat(f"Created message, message ID: {message.id}", Fore.GREEN)
 
         # Run the agent
         run = myPproject_client.agents.create_and_process_run(thread_id=mytheadID, agent_id=myAgentID,toolset=myToolSet)
-        print(f"{Fore.GREEN}Run finished with status: {run.status}")
+        printFormat(f"Run finished with status: {run.status}",Fore.GREEN)
 
         if run.status == "failed":
             # Check if you got "Rate limit is exceeded.", then you want to get more quota
             print(f"Run failed: {run.last_error}")
-            return f"Error: {run.last_error}"
+            return f"Error: {run.last_error}", None
 
         # Get messages from the thread
         messages = myPproject_client.agents.list_messages(thread_id=mytheadID)
-       # print(f"Messages: {messages}")
-
-        # Get the last message from the sender
-        last_msg = messages.get_last_text_message_by_role("assistant")
+        
+        # Get the last message from the assistant
+        last_msg = messages.get_last_message_by_role("assistant")
+        
         if last_msg:
-            #print(f"{Fore.GREEN} Last Message: {last_msg.text.value}")
-            return last_msg.text.value
-
-        return "No response from the assistant."
+            #Porcess full assitantRespose.
+            textResponse, imgPathResponse = processFoundryAIAgentResponse(last_msg)   
+            #printFormat(f"Last Message text: {textResponse}", Fore.GREEN)
+            #printFormat(f"Last Message Img: {imgPathResponse}", Fore.GREEN)
+            return textResponse, imgPathResponse
+        
+        #Exception case no response from the assistant
+        return "No response from the assistant.", None
     except Exception as e:
         # Handle any unexpected errors
         print(f"An error occurred: {str(e)}")
-        return f"Error: {str(e)}"
+        return f"Error: {str(e)}", None
