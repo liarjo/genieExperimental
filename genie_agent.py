@@ -1,19 +1,30 @@
 import os
 import json
 import asyncio
-from typing import Any, Callable, Set, Dict, Optional
+from typing import Any, Callable, Set, Optional
 from pathlib import Path
 from colorama import Fore, Style
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import FunctionTool, ToolSet,CodeInterpreterTool,ThreadMessage
 from azure.identity import DefaultAzureCredential
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.dashboards import GenieAPI
+from databricks_ai_bridge.genie import Genie
 
 
 def printFormat(message:str, color: str):
     #Print format function to print messages in different colors
     print(f"{color}{message}{Style.RESET_ALL}")
+
+def genie_to_object(genie_response):
+    query = genie_response.query
+    result = genie_response.result
+    description = genie_response.description
+
+    printFormat(f"Description: {description}", Fore.YELLOW)
+    printFormat(f"Query: {query}", Fore.YELLOW)
+    printFormat(f"Result: {result}", Fore.YELLOW)
+    
+    return {"query": query, "result": result, "description": description}
 
 async def ask_genie(question: str, space_id: str,workspace_client: WorkspaceClient, conversation_id: Optional[str] = None) -> tuple[str, str]:
     """
@@ -41,51 +52,14 @@ async def ask_genie(question: str, space_id: str,workspace_client: WorkspaceClie
         - The conversation ID used for the interaction.
     """
     try:
-        genie_api = GenieAPI(workspace_client.api_client)
+        
+        genie = Genie(space_id, client=workspace_client)
+        
+        genie_response = genie.ask_question(question)
 
-        loop = asyncio.get_running_loop()
-        if conversation_id is None:
-            initial_message = await loop.run_in_executor(None, genie_api.start_conversation_and_wait, space_id, question)
-            conversation_id = initial_message.conversation_id
-        else:
-            initial_message = await loop.run_in_executor(None, genie_api.create_message_and_wait, space_id, conversation_id, question)
+        theResponse = genie_to_object(genie_response)
 
-        query_result = None
-        if initial_message.query_result is not None:
-            query_result = await loop.run_in_executor(None, genie_api.get_message_query_result,
-                space_id, initial_message.conversation_id, initial_message.id)
-
-        message_content = await loop.run_in_executor(None, genie_api.get_message,
-            space_id, initial_message.conversation_id, initial_message.id)
-
-       
-        if query_result and query_result.statement_response:
-            results = await loop.run_in_executor(None, workspace_client.statement_execution.get_statement,
-                query_result.statement_response.statement_id)
-            
-            query_description = ""
-            query_query = ""
-            for attachment in message_content.attachments:
-                if attachment.query and attachment.query.description:
-                    query_description = attachment.query.description
-                    query_query=attachment.query.query
-                    printFormat(f"query_description:\n {query_description}",Fore.GREEN)
-                    printFormat(f"query_query:\n {query_query}",Fore.GREEN)
-                    break
-
-            return json.dumps({
-                "columns": results.manifest.schema.as_dict(),
-                "data": results.result.as_dict(),
-                "query_description": query_description,
-                "query_query": query_query,
-            }), conversation_id
-
-        if message_content.attachments:
-            for attachment in message_content.attachments:
-                if attachment.text and attachment.text.content:
-                    return json.dumps({"message": attachment.text.content}), conversation_id
-
-        return json.dumps({"message": message_content.content}), conversation_id
+        return json.dumps(theResponse, indent=2), conversation_id
     except Exception as e:
         printFormat(f"Error in ask_genie: {str(e)}", Fore.RED)
         return json.dumps({"error": "An error occurred while processing your request."}), conversation_id
@@ -97,7 +71,7 @@ async def askADBGenieAsync(prompt: str) -> str:
 
     :param prompt  (str): the question to make to Genie assitante about data.
     :return: text response to the question. 
-    :rtype: str
+    :rtype: tuple [str, str] that coinstain response and conversation_id
     """
     theResponse = ""
     try:
@@ -111,10 +85,10 @@ async def askADBGenieAsync(prompt: str) -> str:
         )
 
         print(f"")
-        print(f"askADBGenieAsync Prompt: {prompt}")
+        printFormat(f"askADBGenieAsync Prompt: {prompt}", Fore.YELLOW)
         print(f"")
 
-        theResponse = await (ask_genie(prompt, DATABRICKS_SPACE_ID, workspace_client))
+        theResponse,conversation_id  = await (ask_genie(prompt, DATABRICKS_SPACE_ID, workspace_client))
     except Exception as e:
         # Handle any unexpected errors
         print(f"An error occurred: {str(e)}")
@@ -145,7 +119,7 @@ def askDatabaseQuestions(prompt: str) -> str:
 
     :param prompt  (str): the question to answwer with grounded data 
     :return: text response to the question. 
-    :rtype: str
+    :rtype: str that coinstain   query,   result and  description
     """
     import nest_asyncio
     nest_asyncio.apply()
@@ -203,7 +177,7 @@ def InitAgent()-> tuple[str, str, AIProjectClient, ToolSet]:
         - Always create visualizations as `.png` files.
         - Adapt visualizations (e.g., labels) to the user's language preferences.
         - When asked to download data, default to a `.csv` format file and use the most recent data.
-        - Do not include file download links in the response
+        - Do not include file download links in the response, never
 
 
     Conduct Guidelines

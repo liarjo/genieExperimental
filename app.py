@@ -153,4 +153,7 @@ def main(page: ft.Page):
 
 # Run the Flet app
 if __name__ == "__main__":
+    #windows app
     ft.app(target=main)
+    #Web app
+    #ft.app(target=main, view=ft.AppView.WEB_BROWSER)
